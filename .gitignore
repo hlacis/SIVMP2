@@ -426,3 +426,19 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# JetBrains Rider
+.idea/
+
+# .NET build files
+**/bin/
+**/obj/
+
+# Frontend
+**/node_modules/
+**/dist/
+
+# Local secrets
+**/.env
+**/.env.*
+**/appsettings.*.local.json

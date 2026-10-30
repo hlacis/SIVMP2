@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/server/">
+    <Project Path="server/SIVMP2.Api/SIVMP2.Api.csproj" />
+  </Folder>
+</Solution>

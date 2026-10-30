@@ -1,0 +1,10 @@
+**/node_modules
+**/bin
+**/obj
+**/dist
+**/.idea
+.git
+.gitignore
+**/.env
+**/.env.*
+**/appsettings.*.local.json
