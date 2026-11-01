@@ -2,16 +2,73 @@
 import { useState } from 'react'
 import '../styles/LoginPage.css'
 
-function App() {
+type AuthenticatedUser = {
+    id: string
+    userName: string
+    email: string | null
+    roles: string[]
+}
+
+type LoginPageProps = {
+    onLoginSuccess: (user: AuthenticatedUser) => void
+}
+
+function App({ onLoginSuccess }: LoginPageProps) {
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
+    const [loginError, setLoginError] = useState('')
+    const [isLoading, setIsLoading] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
-
-    const handleLogin = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault()
 
-        // We will connect this form to the backend later
-        console.log('Login form submitted')
+        setLoginError('')
+        setIsLoading(true)
+
+        try {
+            // Step 1: Obtain the CSRF token
+            const csrfResponse = await fetch('/api/auth/csrf', {
+                credentials: 'same-origin'
+            })
+
+            if (!csrfResponse.ok) {
+                throw new Error('Could not initialize secure login.')
+            }
+
+            const { csrfToken } = await csrfResponse.json()
+
+            // Step 2: Send credentials to ASP.NET Core
+            const loginResponse = await fetch('/api/auth/login', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    userName: username,
+                    password: password
+                })
+            })
+
+            if (!loginResponse.ok) {
+                if (loginResponse.status === 401) {
+                    throw new Error('Invalid username or password.')
+                }
+
+                throw new Error('Login failed. Please try again.')
+            }
+
+            const user: AuthenticatedUser = await loginResponse.json()
+
+            onLoginSuccess(user)
+        } catch (error) {
+            setLoginError(
+                error instanceof Error ? error.message : 'Something went wrong.'
+            )
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -80,8 +137,18 @@ function App() {
                         </button>
                     </div>
 
-                    <button className="login-button" type="submit">
-                        Log in
+                    {loginError && (
+                        <p role="alert" style={{ color: '#dc2626', marginBottom: '12px' }}>
+                            {loginError}
+                        </p>
+                    )}
+
+                    <button
+                        className="login-button"
+                        type="submit"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? 'Logging in...' : 'Log in'}
                     </button>
                 </form>
 

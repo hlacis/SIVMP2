@@ -13,6 +13,8 @@ type User = {
 }
 type UsersPageProps = {
     role: UserRole
+    userName: string
+    onLogout: () => void
 }
 
 // Temporary example data for the user overview
@@ -26,7 +28,7 @@ const exampleUsers: User[] = [
     { id: 7, name: 'Ida Madsen', username: 'madsen.ida', role: 'User' }
 ]
 
-const UsersPage = ({ role }: UsersPageProps) => {
+const UsersPage = ({ role, userName, onLogout }: UsersPageProps) => {
     const [users] = useState<User[]>(exampleUsers)
     const [search, setSearch] = useState('')
     const [selectedRole, setSelectedRole] = useState('All')
@@ -68,13 +70,17 @@ const UsersPage = ({ role }: UsersPageProps) => {
                         <p>User management</p>
                     </div>
                 </div>
-                
+
                 <div className="current-user">
-                    <strong className="current-user-name">Mette Kvist</strong>
+                    <strong className="current-user-name">{userName}</strong>
 
                     <span className="current-user-role">{role}</span>
 
-                    <button className="logout-button" type="button">
+                    <button
+                        className="logout-button"
+                        type="button"
+                        onClick={onLogout}
+                    >
                         Log out
                     </button>
                 </div>
