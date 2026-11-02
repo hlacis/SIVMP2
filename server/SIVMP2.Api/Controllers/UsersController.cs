@@ -38,12 +38,12 @@ public class UsersController : ControllerBase
 
         var totalUsers = await _userManager.Users.CountAsync();
 
-        var users = _userManager.Users
+        var users = await _userManager.Users
             .OrderBy(user => user.UserName)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
-
+            .ToListAsync();
+        
         var userList = new List<object>();
 
         foreach (var user in users)
@@ -220,6 +220,17 @@ public class UsersController : ControllerBase
                 message = "User not found."
             });
         }
+        
+        var existingUserName = await _userManager.FindByNameAsync(
+            request.UserName);
+
+        if (existingUserName != null && existingUserName.Id != user.Id)
+        {
+            return Conflict(new
+            {
+                message = "This username is already in use."
+            });
+        }
 
         var existingEmail = await _userManager.FindByEmailAsync(
             request.Email);
@@ -251,6 +262,35 @@ public class UsersController : ControllerBase
             user.Id,
             user.UserName,
             user.Email
+        });
+    }
+    
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteUser(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+
+        if (user == null)
+        {
+            return NotFound(new
+            {
+                message = "User not found."
+            });
+        }
+
+        var result = await _userManager.DeleteAsync(user);
+
+        if (!result.Succeeded)
+        {
+            return BadRequest(new
+            {
+                errors = result.Errors.Select(e => e.Description)
+            });
+        }
+
+        return Ok(new
+        {
+            message = "User deleted successfully."
         });
     }
 
