@@ -2,16 +2,23 @@
 import { useState } from 'react'
 import '../styles/LoginPage.css'
 
-function App() {
+type LoginPageProps = {
+    onLoginSuccess: () => void
+}
+const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
+    const [loginError, setLoginError] = useState('')
 
     const handleLogin = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault()
+        setLoginError('')
 
-        // We will connect this form to the backend later
+        // Backend login validation will be added here
         console.log('Login form submitted')
+
+        // Temporary navigation will be connected after backend validation
     }
 
     return (
@@ -85,6 +92,11 @@ function App() {
                     </button>
                 </form>
 
+                {loginError && (
+                    <p className="login-error" role="alert">
+                        {loginError}
+                    </p>
+                )}
                 <p className="login-footer">
                     Secure access for authorised employees
                 </p>
@@ -93,4 +105,4 @@ function App() {
     )
 }
 
-export default App
+export default LoginPage

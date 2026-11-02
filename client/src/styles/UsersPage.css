@@ -321,5 +321,150 @@
     border-color: #45634e;
     color: #faf8f3;
 }
+/* Dark overlay behind the modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(30, 39, 31, 0.45);
+}
+
+/* Modal container */
+.user-modal {
+    width: 100%;
+    max-width: 480px;
+    padding: 32px;
+    background: #FAF8F3;
+    border: 1px solid #E5DED1;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+}
+
+.modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.modal-header h2 {
+    margin: 0 0 8px;
+    color: #344B3B;
+    font-size: 24px;
+}
+
+.modal-header p {
+    margin: 0;
+    color: #81776B;
+    font-size: 14px;
+}
+
+.modal-close-button {
+    border: none;
+    background: transparent;
+    color: #514638;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+.user-modal form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.user-modal label {
+    margin-top: 8px;
+    color: #514638;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.user-modal input,
+.user-modal select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #D8D0C2;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: #25213C;
+    font: inherit;
+}
+
+.user-modal input:focus,
+.user-modal select:focus {
+    outline: 2px solid #45634E;
+    outline-offset: 1px;
+}
+
+.modal-helper-text {
+    margin: 12px 0;
+    color: #81776B;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.form-error {
+    margin: 0;
+    color: #B42318;
+    font-size: 14px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.cancel-button,
+.save-button {
+    padding: 11px 18px;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cancel-button {
+    border: 1px solid #D8D0C2;
+    background: transparent;
+    color: #514638;
+}
+
+.save-button {
+    border: 1px solid #344B3B;
+    background: #344B3B;
+    color: #FFFFFF;
+}
+
+.save-button:hover {
+    background: #45634E;
+}
+.role-locked-field {
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #ded6c9;
+    border-radius: 9px;
+    background: #f4f0e8;
+    color: #49443c;
+    font: inherit;
+}
+
+.modal-helper-text {
+    margin: 10px 0 0;
+    color: #82796d;
+    font-size: 13px;
+    line-height: 1.5;
+}
 
 
