@@ -1,0 +1,81 @@
+﻿
+.first-login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #f6f3eb;
+}
+
+.first-login-card {
+    width: 100%;
+    max-width: 450px;
+    padding: 32px;
+    background: #fffdf8;
+    border: 1px solid #e4dfd3;
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(38, 54, 43, 0.08);
+}
+
+.first-login-card h1 {
+    margin: 0 0 10px;
+    color: #304c3a;
+    font-size: 25px;
+}
+
+.first-login-description {
+    margin: 0 0 26px;
+    color: #777368;
+    line-height: 1.6;
+}
+
+.first-login-card label {
+    display: block;
+    margin: 18px 0 8px;
+    color: #403f36;
+    font-weight: 600;
+}
+
+.first-login-card input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    border: 1px solid #d8d2c5;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.first-login-card input:focus {
+    outline: 2px solid #70b7a0;
+    outline-offset: 1px;
+}
+
+.password-helper {
+    margin: 6px 0 14px;
+    color: #898477;
+    font-size: 13px;
+}
+
+.first-login-error {
+    color: #c44747;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.first-login-button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    background: #345340;
+    color: white;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.first-login-button:hover {
+    background: #263f30;
+}
