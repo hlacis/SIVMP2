@@ -22,7 +22,7 @@ public class UsersController : ControllerBase
         _userManager = userManager;
         _roleManager = roleManager;
     }
-    
+
     [HttpGet]
     public async Task<IActionResult> GetUsers(
         int page = 1,
@@ -43,7 +43,7 @@ public class UsersController : ControllerBase
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
-        
+
         var userList = new List<object>();
 
         foreach (var user in users)
@@ -54,7 +54,6 @@ public class UsersController : ControllerBase
             {
                 user.Id,
                 user.UserName,
-                user.Email,
                 Roles = roles
             });
         }
@@ -69,8 +68,6 @@ public class UsersController : ControllerBase
             Users = userList
         });
     }
-
-
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetUser(string id)
@@ -88,11 +85,10 @@ public class UsersController : ControllerBase
         return Ok(new
         {
             user.Id,
-            user.UserName,
-            user.Email
+            user.UserName
         });
     }
-    
+
     // This may not be needed but is useful for account lookup operations.
     [HttpGet("username/{username}")]
     public async Task<IActionResult> GetUserByUsername(string username)
@@ -113,13 +109,12 @@ public class UsersController : ControllerBase
         {
             user.Id,
             user.UserName,
-            user.Email,
             Roles = roles
         });
     }
-    //restricts users from creating other accounts through this endpoint
-    [Authorize(Roles = "Superuser,Admin")]
 
+    // Restricts users from creating other accounts through this endpoint.
+    [Authorize(Roles = "Superuser,Admin")]
     [HttpPost]
     public async Task<IActionResult> CreateUser(
         [FromBody] CreateUserRequest request)
@@ -132,17 +127,6 @@ public class UsersController : ControllerBase
             return Conflict(new
             {
                 message = "This username is already in use."
-            });
-        }
-
-        var existingEmail = await _userManager.FindByEmailAsync(
-            request.Email);
-
-        if (existingEmail != null)
-        {
-            return Conflict(new
-            {
-                message = "This email address is already in use."
             });
         }
 
@@ -162,8 +146,7 @@ public class UsersController : ControllerBase
 
         var user = new IdentityUser
         {
-            UserName = request.UserName,
-            Email = request.Email
+            UserName = request.UserName
         };
 
         var result = await _userManager.CreateAsync(
@@ -199,14 +182,12 @@ public class UsersController : ControllerBase
             {
                 user.Id,
                 user.UserName,
-                user.Email,
                 Role = "User"
             });
     }
-    
-    //User accounts can't update user info
-    [Authorize(Roles = "Superuser,Admin")]
 
+    // User accounts can't update user info.
+    [Authorize(Roles = "Superuser,Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateUser(
         string id,
@@ -221,7 +202,7 @@ public class UsersController : ControllerBase
                 message = "User not found."
             });
         }
-        
+
         var existingUserName = await _userManager.FindByNameAsync(
             request.UserName);
 
@@ -233,19 +214,7 @@ public class UsersController : ControllerBase
             });
         }
 
-        var existingEmail = await _userManager.FindByEmailAsync(
-            request.Email);
-
-        if (existingEmail != null && existingEmail.Id != user.Id)
-        {
-            return Conflict(new
-            {
-                message = "This email address is already in use."
-            });
-        }
-
         user.UserName = request.UserName;
-        user.Email = request.Email;
 
         var result = await _userManager.UpdateAsync(user);
 
@@ -261,11 +230,10 @@ public class UsersController : ControllerBase
         {
             message = "User updated successfully.",
             user.Id,
-            user.UserName,
-            user.Email
+            user.UserName
         });
     }
-    
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUser(string id)
     {
@@ -295,8 +263,6 @@ public class UsersController : ControllerBase
         });
     }
 
-
-   
     [HttpPut("{id}/role")]
     public async Task<IActionResult> UpdateUserRole(
         string id,
@@ -311,7 +277,7 @@ public class UsersController : ControllerBase
                 message = "User not found."
             });
         }
-        
+
         var targetRoles = await _userManager.GetRolesAsync(user);
 
         if (targetRoles.Contains("Superuser") ||
@@ -391,17 +357,12 @@ public class UsersController : ControllerBase
             Role = request.Role
         });
     }
- 
 }
 
 public class CreateUserRequest
 {
     [Required]
     public string UserName { get; set; } = string.Empty;
-
-    [Required]
-    [EmailAddress]
-    public string Email { get; set; } = string.Empty;
 
     [Required]
     [MinLength(8)]
@@ -412,16 +373,10 @@ public class UpdateUserRequest
 {
     [Required]
     public string UserName { get; set; } = string.Empty;
-
-    [Required]
-    [EmailAddress]
-    public string Email { get; set; } = string.Empty;
 }
-
 
 public class UpdateUserRoleRequest
 {
     [Required]
     public string Role { get; set; } = string.Empty;
 }
-
