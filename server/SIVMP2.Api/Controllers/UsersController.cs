@@ -3,11 +3,13 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace SIVMP2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "User,Superuser,Admin")]
 public class UsersController : ControllerBase
 {
     private readonly UserManager<IdentityUser> _userManager;
@@ -20,8 +22,6 @@ public class UsersController : ControllerBase
         _userManager = userManager;
         _roleManager = roleManager;
     }
-
-    
     
     [HttpGet]
     public async Task<IActionResult> GetUsers(
@@ -117,8 +117,8 @@ public class UsersController : ControllerBase
             Roles = roles
         });
     }
-
-
+    //restricts users from creating other accounts through this endpoint
+    [Authorize(Roles = "Superuser,Admin")]
 
     [HttpPost]
     public async Task<IActionResult> CreateUser(
@@ -203,8 +203,9 @@ public class UsersController : ControllerBase
                 Role = "User"
             });
     }
-
-
+    
+    //User accounts can't update user info
+    [Authorize(Roles = "Superuser,Admin")]
 
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateUser(
@@ -309,6 +310,17 @@ public class UsersController : ControllerBase
             {
                 message = "User not found."
             });
+        }
+        
+        var targetRoles = await _userManager.GetRolesAsync(user);
+
+        if (targetRoles.Contains("Superuser") ||
+            targetRoles.Contains("Admin"))
+        {
+            if (!User.IsInRole("Admin"))
+            {
+                return Forbid();
+            }
         }
 
         var validRoles = new[] { "User", "Superuser", "Admin" };
