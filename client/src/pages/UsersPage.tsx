@@ -1,16 +1,10 @@
-﻿
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import '../styles/UsersPage.css'
-import { LockKeyhole } from 'lucide-react'
+import AddUserModal from '../components/AddUserModal'
+import EditUserModal from '../components/EditUserModal'
+import type { User, UserRole } from '../types/User'
+import UsersTable from '../components/UsersTable'
 
-type UserRole = 'User' | 'Superuser' | 'Admin'
-
-type User = {
-    id: number
-    name: string
-    username: string
-    role: UserRole
-}
 type UsersPageProps = {
     role: UserRole
     userName: string
@@ -29,9 +23,34 @@ const exampleUsers: User[] = [
 ]
 
 const UsersPage = ({ role, userName, onLogout }: UsersPageProps) => {
-    const [users] = useState<User[]>(exampleUsers)
+    const [users, setUsers] = useState<User[]>(exampleUsers)
     const [search, setSearch] = useState('')
     const [selectedRole, setSelectedRole] = useState('All')
+
+    // Controls whether the Add user modal is open
+    const [isAddUserOpen, setIsAddUserOpen] = useState(false)
+
+    // Stores the new user's form values
+    const [newName, setNewName] = useState('')
+    const [newUsername, setNewUsername] = useState('')
+    const [newPassword, setNewPassword] = useState('')
+    const [newRole, setNewRole] = useState<UserRole>('User')
+    
+    // Stores validation messages
+    const [formError, setFormError] = useState('')
+
+    // Controls the Edit user modal
+    const [isEditUserOpen, setIsEditUserOpen] = useState(false)
+    const [selectedUser, setSelectedUser] = useState<User | null>(null)
+
+    // Stores the selected user's editable values
+    const [editName, setEditName] = useState('')
+    const [editUsername, setEditUsername] = useState('')
+    const [editRole, setEditRole] = useState<UserRole>('User')
+    const [editFormError, setEditFormError] = useState('')
+    
+    // Controls the delete confirmation modal
+    const [userToDelete, setUserToDelete] = useState<User | null>(null)
 
     // Filter users by name, username and selected role
     const filteredUsers = users.filter(user => {
@@ -44,6 +63,112 @@ const UsersPage = ({ role, userName, onLogout }: UsersPageProps) => {
 
         return matchesSearch && matchesRole
     })
+
+    // Adds a new user to the temporary frontend list
+    const handleAddUser = () => {
+        if (!newName.trim() || !newUsername.trim() || !newRole || !newPassword) {
+            setFormError('Please fill in all required fields.')
+            return
+        }
+
+        if (newPassword.length < 12) {
+            setFormError('The temporary password must be at least 12 characters.')
+            return
+        }
+
+        // Prevent duplicate usernames
+        const usernameExists = users.some(
+            user => user.username.toLowerCase() === newUsername.trim().toLowerCase()
+        )
+
+        if (usernameExists) {
+            setFormError('This username already exists.')
+            return
+        }
+
+        const newUser: User = {
+            id: Math.max(0, ...users.map(user => user.id)) + 1,
+            name: newName.trim(),
+            username: newUsername.trim(),
+            role: newRole
+        }
+
+        setUsers(currentUsers => [...currentUsers, newUser])
+
+        // Reset the form after creating the user
+        setNewName('')
+        setNewUsername('')
+        setNewPassword('')
+        setNewRole('User')
+        setFormError('')
+        setIsAddUserOpen(false)
+    }
+
+    // Opens the Edit user modal with the selected user's current details
+    const handleOpenEditUser = (user: User) => {
+        setSelectedUser(user)
+        setEditName(user.name)
+        setEditUsername(user.username)
+        setEditRole(user.role)
+        setEditFormError('')
+        setIsEditUserOpen(true)
+    }
+
+    // Saves changes to the selected user
+    const handleSaveEditUser = () => {
+        if (!selectedUser) return
+
+        if (!editName.trim() || !editUsername.trim()) {
+            setEditFormError('Please fill in all required fields.')
+            return
+        }
+
+        // Prevent duplicate usernames belonging to another user
+        const usernameExists = users.some(
+            user =>
+                user.id !== selectedUser.id &&
+                user.username.toLowerCase() === editUsername.trim().toLowerCase()
+        )
+
+        if (usernameExists) {
+            setEditFormError('This username already exists.')
+            return
+        }
+
+        // Update the selected user in the temporary frontend list
+        setUsers(currentUsers =>
+            currentUsers.map(user =>
+                user.id === selectedUser.id
+                    ? {
+                        ...user,
+                        name: editName.trim(),
+                        username: editUsername.trim(),
+                        role: editRole
+                    }
+                    : user
+            )
+        )
+
+        setIsEditUserOpen(false)
+        setSelectedUser(null)
+        setEditFormError('')
+    }
+
+    // Opens the delete confirmation modal
+    const handleOpenDeleteUser = (user: User) => {
+        setUserToDelete(user)
+    }
+
+    // Deletes the selected user after confirmation
+    const handleConfirmDeleteUser = () => {
+        if (!userToDelete) return
+
+        setUsers(currentUsers =>
+            currentUsers.filter(user => user.id !== userToDelete.id)
+        )
+
+        setUserToDelete(null)
+}
 
     return (
         <main className="users-page">
@@ -72,7 +197,7 @@ const UsersPage = ({ role, userName, onLogout }: UsersPageProps) => {
                 </div>
 
                 <div className="current-user">
-                    <strong className="current-user-name">{userName}</strong>
+                    <strong className="current-user-name">Mette Kvist</strong>
 
                     <span className="current-user-role">{role}</span>
 
@@ -84,7 +209,6 @@ const UsersPage = ({ role, userName, onLogout }: UsersPageProps) => {
                         Log out
                     </button>
                 </div>
-
             </header>
 
             <section className="users-content">
@@ -102,7 +226,14 @@ const UsersPage = ({ role, userName, onLogout }: UsersPageProps) => {
 
                     {/* Only Admin and Superuser can add users */}
                     {role !== 'User' && (
-                        <button className="add-user-button" type="button">
+                        <button
+                            className="add-user-button"
+                            type="button"
+                            onClick={() => {
+                                setFormError('')
+                                setIsAddUserOpen(true)
+                            }}
+                        >
                             Add user
                         </button>
                     )}
@@ -132,88 +263,105 @@ const UsersPage = ({ role, userName, onLogout }: UsersPageProps) => {
                     />
                 </div>
 
-                <div className="users-table-wrapper">
-                    <table className="users-table">
-                        <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Username</th>
-                            <th>Role</th>
-                            {role !== 'User' && <th>Actions</th>}
-                        </tr>
-                        </thead>
-
-
-                        <tbody>
-                        {filteredUsers.map(user => (
-                            <tr key={user.id}>
-                                <td>{user.name}</td>
-                                <td className="username-cell">{user.username}</td>
-                                <td>
-                <span className={`role-badge ${user.role.toLowerCase()}`}>
-                    {user.role}
-                </span>
-                                </td>
-
-                                {/* Only show the Actions column for Admin and Superuser */}
-                                {role !== 'User' && (
-                                    <td>
-                                        <div className="user-actions">
-                                            {/* Admin can manage all users */}
-                                            {role === 'Admin' && (
-                                                <>
-                                                    <button type="button" className="edit-button">
-                                                        Edit
-                                                    </button>
-                                                    <button type="button" className="delete-button">
-                                                        Delete
-                                                    </button>
-                                                </>
-                                            )}
-
-                                            {/* Superuser can manage regular users only */}
-                                            {role === 'Superuser' && user.role === 'User' && (
-                                                <>
-                                                    <button type="button" className="edit-button">
-                                                        Edit
-                                                    </button>
-                                                    <button type="button" className="delete-button">
-                                                        Delete
-                                                    </button>
-                                                </>
-                                            )}
-
-                                            {/* Admin access is required to manage privileged accounts */}
-                                            {role === 'Superuser' && user.role !== 'User' && (
-                                                <span
-                                                    className="locked-action"
-                                                    title="Admin access required."
-                                                    aria-label="Admin access required"
-                                                >
-                                <LockKeyhole size={16} />
-                            </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                )}
-                            </tr>
-                        ))}
-
-                        {filteredUsers.length === 0 && (
-                            <tr>
-                                <td colSpan={role === 'User' ? 3 : 4} className="empty-message">
-                                    No users found.
-                                </td>
-                            </tr>
-                        )}
-                        </tbody>
-                    </table>
-                </div>
+                <UsersTable
+                    users={filteredUsers}
+                    role={role}
+                    onEdit={handleOpenEditUser}
+                    onDelete={handleOpenDeleteUser}
+                />
 
                 <p className="users-count">
                     Showing {filteredUsers.length} of {users.length} users
                 </p>
             </section>
+
+            <AddUserModal
+                role={role}
+                isOpen={isAddUserOpen}
+                newName={newName}
+                newUsername={newUsername}
+                newPassword={newPassword}
+                setNewPassword={setNewPassword}
+                newRole={newRole}
+                formError={formError}
+                setNewName={setNewName}
+                setNewUsername={setNewUsername}
+                setNewRole={setNewRole}
+                setFormError={setFormError}
+                onClose={() => setIsAddUserOpen(false)}
+                onSubmit={handleAddUser}
+            />
+            {userToDelete && (
+                <div
+                    className="modal-overlay"
+                    onClick={() => setUserToDelete(null)}
+                >
+                    <div
+                        className="user-modal"
+                        onClick={event => event.stopPropagation()}
+                    >
+                        <div className="modal-header">
+                            <div>
+                                <h2>Delete user?</h2>
+                                <p>
+                                    Are you sure you want to delete {userToDelete.name}?
+                                    This action cannot be undone.
+                                </p>
+                            </div>
+
+                            <button
+                                className="modal-close-button"
+                                type="button"
+                                onClick={() => setUserToDelete(null)}
+                                aria-label="Close modal"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="cancel-button"
+                                type="button"
+                                onClick={() => setUserToDelete(null)}
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                className="delete-button"
+                                type="button"
+                                onClick={handleConfirmDeleteUser}
+                            >
+                                Delete user
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            
+
+            {selectedUser && (
+                <EditUserModal
+                    user={selectedUser}
+                    role={role}
+                    isOpen={isEditUserOpen}
+                    editName={editName}
+                    editUsername={editUsername}
+                    editRole={editRole}
+                    formError={editFormError}
+                    setEditName={setEditName}
+                    setEditUsername={setEditUsername}
+                    setEditRole={setEditRole}
+                    setFormError={setEditFormError}
+                    onClose={() => {
+                        setIsEditUserOpen(false)
+                        setSelectedUser(null)
+                    }}
+                    onSubmit={handleSaveEditUser}
+                />
+            )}
         </main>
     )
 }
