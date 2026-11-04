@@ -79,6 +79,7 @@ function App() {
                 <UsersPage
                     role={currentRole}
                     userName={currentUser.userName}
+                    accessToken={accessToken}
                     onLogout={handleLogout}
                 />
             ) : (

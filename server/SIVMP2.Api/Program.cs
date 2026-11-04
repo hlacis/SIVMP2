@@ -27,7 +27,7 @@ builder.Services
         options.Lockout.MaxFailedAccessAttempts = 5;
         options.Lockout.AllowedForNewUsers = true;
 
-        options.User.RequireUniqueEmail = true;
+        options.User.RequireUniqueEmail = false;
     })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
@@ -86,6 +86,34 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Initialize application roles
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider
+        .GetRequiredService<RoleManager<IdentityRole>>();
+
+    string[] roles = { "User", "Superuser", "Admin" };
+
+    foreach (var role in roles)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+        {
+            var result = await roleManager.CreateAsync(
+                new IdentityRole(role));
+
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to create role '{role}': " +
+                    string.Join(
+                        ", ",
+                        result.Errors.Select(e => e.Description))
+                );
+            }
+        }
+    }
+}
 
 if (app.Environment.IsDevelopment())
 {
