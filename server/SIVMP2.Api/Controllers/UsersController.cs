@@ -186,7 +186,8 @@ public class UsersController : ControllerBase
             });
     }
 
-    // User accounts can't update user info.
+    // User accounts can't update user info. 
+    // Superusers can edit regular Users. Admins can edit everyone. (Maria)
     [Authorize(Roles = "Superuser,Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateUser(
@@ -194,13 +195,23 @@ public class UsersController : ControllerBase
         [FromBody] UpdateUserRequest request)
     {
         var user = await _userManager.FindByIdAsync(id);
-
         if (user == null)
         {
             return NotFound(new
             {
                 message = "User not found."
             });
+        }
+
+        // Superusers can only edit accounts with the regular User role. (Maria)
+        var targetRoles = await _userManager.GetRolesAsync(user);
+
+        if (User.IsInRole("Superuser") && !User.IsInRole("Admin"))
+        {
+            if (targetRoles.Count != 1 || !targetRoles.Contains("User"))
+            {
+                return Forbid();
+            }
         }
 
         var existingUserName = await _userManager.FindByNameAsync(
@@ -233,7 +244,9 @@ public class UsersController : ControllerBase
             user.UserName
         });
     }
-
+    
+    // Superusers can delete regular users. Admins can delete everyone. (Maria) 
+    [Authorize(Roles = "Superuser,Admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUser(string id)
     {
@@ -245,6 +258,15 @@ public class UsersController : ControllerBase
             {
                 message = "User not found."
             });
+        }
+
+        // Check the role of the user being deleted
+        var targetRoles = await _userManager.GetRolesAsync(user);
+
+        if (targetRoles.Any(role => role == "Admin" || role == "Superuser")
+            && !User.IsInRole("Admin"))
+        {
+            return Forbid();
         }
 
         var result = await _userManager.DeleteAsync(user);
@@ -262,7 +284,9 @@ public class UsersController : ControllerBase
             message = "User deleted successfully."
         });
     }
-
+    
+    // Only Admin can change user roles (Maria)
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id}/role")]
     public async Task<IActionResult> UpdateUserRole(
         string id,
@@ -280,6 +304,8 @@ public class UsersController : ControllerBase
 
         var targetRoles = await _userManager.GetRolesAsync(user);
 
+        //Needs to be deleted bc it's only admin's responsibility (Maria)
+        /*
         if (targetRoles.Contains("Superuser") ||
             targetRoles.Contains("Admin"))
         {
@@ -287,7 +313,7 @@ public class UsersController : ControllerBase
             {
                 return Forbid();
             }
-        }
+        } */
 
         var validRoles = new[] { "User", "Superuser", "Admin" };
 
