@@ -10,15 +10,16 @@ type AuthenticatedUser = {
 }
 
 type LoginPageProps = {
-    onLoginSuccess: (user: AuthenticatedUser) => void
+    onLoginSuccess: (user: AuthenticatedUser, token: string) => void
 }
 
-function App({ onLoginSuccess }: LoginPageProps) {
+function LoginPage({ onLoginSuccess }: LoginPageProps) {
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [loginError, setLoginError] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
+
     const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault()
 
@@ -26,24 +27,10 @@ function App({ onLoginSuccess }: LoginPageProps) {
         setIsLoading(true)
 
         try {
-            // Step 1: Obtain the CSRF token
-            const csrfResponse = await fetch('/api/auth/csrf', {
-                credentials: 'same-origin'
-            })
-
-            if (!csrfResponse.ok) {
-                throw new Error('Could not initialize secure login.')
-            }
-
-            const { csrfToken } = await csrfResponse.json()
-
-            // Step 2: Send credentials to ASP.NET Core
             const loginResponse = await fetch('/api/auth/login', {
                 method: 'POST',
-                credentials: 'same-origin',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     userName: username,
@@ -53,18 +40,40 @@ function App({ onLoginSuccess }: LoginPageProps) {
 
             if (!loginResponse.ok) {
                 if (loginResponse.status === 401) {
+                    const errorData = await loginResponse.json()
+
+                    if (errorData.message === 'Account temporarily locked.') {
+                        throw new Error(
+                            'Your account is temporarily locked. Please try again in 5 minutes.'
+                        )
+                    }
+
+                    if (errorData.message === 'Account is not confirmed.') {
+                        throw new Error('Your account is not confirmed.')
+                    }
+
                     throw new Error('Invalid username or password.')
                 }
 
                 throw new Error('Login failed. Please try again.')
             }
 
-            const user: AuthenticatedUser = await loginResponse.json()
+            const data: AuthenticatedUser & { token: string } =
+                await loginResponse.json()
 
-            onLoginSuccess(user)
+            if (!data.token) {
+                throw new Error('Authentication token was not received.')
+            }
+
+            const { token, ...user } = data
+
+            onLoginSuccess(user, token)
+
         } catch (error) {
             setLoginError(
-                error instanceof Error ? error.message : 'Something went wrong.'
+                error instanceof Error
+                    ? error.message
+                    : 'Something went wrong.'
             )
         } finally {
             setIsLoading(false)
@@ -138,7 +147,13 @@ function App({ onLoginSuccess }: LoginPageProps) {
                     </div>
 
                     {loginError && (
-                        <p role="alert" style={{ color: '#dc2626', marginBottom: '12px' }}>
+                        <p
+                            role="alert"
+                            style={{
+                                color: '#dc2626',
+                                marginBottom: '12px'
+                            }}
+                        >
                             {loginError}
                         </p>
                     )}
@@ -160,4 +175,4 @@ function App({ onLoginSuccess }: LoginPageProps) {
     )
 }
 
-export default App
+export default LoginPage

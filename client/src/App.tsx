@@ -16,78 +16,66 @@ function App() {
     const [currentUser, setCurrentUser] =
         useState<AuthenticatedUser | null>(null)
 
-    const [isCheckingSession, setIsCheckingSession] =
-        useState(true)
+    const [accessToken, setAccessToken] =
+        useState<string | null>(null)
 
-    useEffect(() => {
-        const restoreSession = async () => {
-            try {
-                const response = await fetch('/api/auth/me', {
-                    credentials: 'same-origin'
-                })
-
-                if (response.ok) {
-                    const user: AuthenticatedUser =
-                        await response.json()
-
-                    setCurrentUser(user)
-                }
-            } catch (error) {
-                console.error('Session check failed:', error)
-            } finally {
-                setIsCheckingSession(false)
-            }
-        }
-
-        restoreSession()
-    }, [])
-
-    const handleLoginSuccess = (user: AuthenticatedUser) => {
+    const handleLoginSuccess = (
+        user: AuthenticatedUser,
+        token: string
+    ) => {
+        setAccessToken(token)
         setCurrentUser(user)
     }
-    const handleLogout = async () => {
-        try {
-            const csrfResponse = await fetch('/api/auth/csrf', {
-                credentials: 'same-origin'
-            })
 
-            if (!csrfResponse.ok) {
-                throw new Error('Could not obtain CSRF token.')
-            }
-
-            const { csrfToken } = await csrfResponse.json()
-
-            const response = await fetch('/api/auth/logout', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken
-                }
-            })
-
-            if (!response.ok) {
-                throw new Error('Logout failed.')
-            }
-
-            setCurrentUser(null)
-        } catch (error) {
-            console.error('Logout failed:', error)
-            alert('Could not log out. Please try again.')
-        }
+    const handleLogout = () => {
+        setAccessToken(null)
+        setCurrentUser(null)
     }
+
+    // Automatically log out when the JWT expires.
+    useEffect(() => {
+        if (!accessToken) return
+
+        const payloadPart = accessToken.split('.')[1]
+
+        if (!payloadPart) {
+            handleLogout()
+            return
+        }
+
+        try {
+            const base64 = payloadPart
+                .replace(/-/g, '+')
+                .replace(/_/g, '/')
+
+            const payload = JSON.parse(atob(base64))
+            const expiresAt = payload.exp * 1000
+            const remainingTime = expiresAt - Date.now()
+
+            if (!Number.isFinite(remainingTime) || remainingTime <= 0) {
+                handleLogout()
+                return
+            }
+
+            const timeout = window.setTimeout(
+                handleLogout,
+                Math.min(remainingTime, 2147483647)
+            )
+
+            return () => window.clearTimeout(timeout)
+        } catch {
+            handleLogout()
+        }
+    }, [accessToken])
 
     const currentRole: UserRole =
         currentUser?.roles.includes('Admin') ? 'Admin' :
             currentUser?.roles.includes('Superuser') ? 'Superuser' :
                 'User'
 
-    if (isCheckingSession) {
-        return <p>Checking session...</p>
-    }
-
     return (
         <>
-            {currentUser ? (
+            {currentUser && accessToken ? (
                 <UsersPage
                     role={currentRole}
                     userName={currentUser.userName}

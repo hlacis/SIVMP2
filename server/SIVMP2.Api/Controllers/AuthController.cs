@@ -1,9 +1,12 @@
-using Microsoft.AspNetCore.Antiforgery;
+
 using System.ComponentModel.DataAnnotations;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-
+using Microsoft.IdentityModel.Tokens;
 
 namespace SIVMP2.Api.Controllers;
 
@@ -11,65 +14,117 @@ namespace SIVMP2.Api.Controllers;
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
-    private readonly SignInManager<IdentityUser> _signInManager;
     private readonly UserManager<IdentityUser> _userManager;
+    private readonly IConfiguration _configuration;
 
     public AuthController(
-        SignInManager<IdentityUser> signInManager,
-        UserManager<IdentityUser> userManager)
+        UserManager<IdentityUser> userManager,
+        IConfiguration configuration)
     {
-        _signInManager = signInManager;
         _userManager = userManager;
-    }
-    
-    [HttpGet("csrf")]
-    [AllowAnonymous]
-    public IActionResult GetCsrfToken(
-        [FromServices] IAntiforgery antiforgery)
-    {
-        var tokens = antiforgery.GetAndStoreTokens(HttpContext);
-
-        Response.Headers.CacheControl = "no-store";
-
-        return Ok(new
-        {
-            csrfToken = tokens.RequestToken
-        });
+        _configuration = configuration;
     }
 
     [HttpPost("login")]
     [AllowAnonymous]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login(
+        [FromBody] LoginRequest request)
     {
+        Response.Headers.CacheControl = "no-store";
+
         var user = await _userManager.FindByNameAsync(request.UserName);
 
         if (user == null)
         {
-            return Unauthorized(new { message = "Invalid username or password." });
+            return Unauthorized(new
+            {
+                message = "Invalid username or password."
+            });
         }
 
-        var result = await _signInManager.PasswordSignInAsync(
-            user,
-            request.Password,
-            isPersistent: false,
-            lockoutOnFailure: true);
-
-        if (result.IsLockedOut)
+        if (await _userManager.IsLockedOutAsync(user))
         {
-            return Unauthorized(new { message = "Account temporarily locked." });
+            return Unauthorized(new
+            {
+                message = "Account temporarily locked."
+            });
         }
 
-        if (!result.Succeeded)
+        var validPassword = await _userManager.CheckPasswordAsync(
+            user, request.Password);
+
+        if (!validPassword)
         {
-            return Unauthorized(new { message = "Invalid username or password." });
+            if (_userManager.SupportsUserLockout)
+            {
+                await _userManager.AccessFailedAsync(user);
+
+                if (await _userManager.IsLockedOutAsync(user))
+                {
+                    return Unauthorized(new
+                    {
+                        message = "Account temporarily locked."
+                    });
+                }
+            }
+
+            return Unauthorized(new
+            {
+                message = "Invalid username or password."
+            });
+        }
+
+        if (!await _userManager.IsEmailConfirmedAsync(user)
+            && _userManager.Options.SignIn.RequireConfirmedEmail)
+        {
+            return Unauthorized(new
+            {
+                message = "Account is not confirmed."
+            });
+        }
+
+        if (_userManager.SupportsUserLockout)
+        {
+            await _userManager.ResetAccessFailedCountAsync(user);
         }
 
         var roles = await _userManager.GetRolesAsync(user);
 
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new("name", user.UserName ?? "")
+        };
+
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim("role", role));
+        }
+
+        var key = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
+
+        var credentials = new SigningCredentials(
+            key, SecurityAlgorithms.HmacSha256);
+
+        var expiresAt = DateTime.UtcNow.AddMinutes(15);
+
+        var token = new JwtSecurityToken(
+            issuer: _configuration["Jwt:Issuer"],
+            audience: _configuration["Jwt:Audience"],
+            claims: claims,
+            expires: expiresAt,
+            signingCredentials: credentials);
+
+        var tokenString = new JwtSecurityTokenHandler()
+            .WriteToken(token);
+
         return Ok(new
         {
             message = "Login successful.",
+            token = tokenString,
+            expiresAt,
             user.Id,
             user.UserName,
             user.Email,
@@ -77,20 +132,19 @@ public class AuthController : ControllerBase
         });
     }
 
-    [HttpPost("logout")]
-    [Authorize]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Logout()
-    {
-        await _signInManager.SignOutAsync();
-        return Ok(new { message = "Logged out successfully." });
-    }
-
     [HttpGet("me")]
     [Authorize]
     public async Task<IActionResult> Me()
     {
-        var user = await _userManager.GetUserAsync(User);
+        var userId = User.FindFirstValue(
+            JwtRegisteredClaimNames.Sub);
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
 
         if (user == null)
         {

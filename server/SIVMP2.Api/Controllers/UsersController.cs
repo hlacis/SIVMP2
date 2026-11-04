@@ -1,13 +1,14 @@
-
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace SIVMP2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "User,Superuser,Admin")]
 public class UsersController : ControllerBase
 {
     private readonly UserManager<IdentityUser> _userManager;
@@ -21,8 +22,6 @@ public class UsersController : ControllerBase
         _roleManager = roleManager;
     }
 
-    
-    
     [HttpGet]
     public async Task<IActionResult> GetUsers(
         int page = 1,
@@ -38,11 +37,11 @@ public class UsersController : ControllerBase
 
         var totalUsers = await _userManager.Users.CountAsync();
 
-        var users = _userManager.Users
+        var users = await _userManager.Users
             .OrderBy(user => user.UserName)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
         var userList = new List<object>();
 
@@ -54,7 +53,6 @@ public class UsersController : ControllerBase
             {
                 user.Id,
                 user.UserName,
-                user.Email,
                 Roles = roles
             });
         }
@@ -69,8 +67,6 @@ public class UsersController : ControllerBase
             Users = userList
         });
     }
-
-
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetUser(string id)
@@ -88,11 +84,10 @@ public class UsersController : ControllerBase
         return Ok(new
         {
             user.Id,
-            user.UserName,
-            user.Email
+            user.UserName
         });
     }
-    
+
     // This may not be needed but is useful for account lookup operations.
     [HttpGet("username/{username}")]
     public async Task<IActionResult> GetUserByUsername(string username)
@@ -113,13 +108,12 @@ public class UsersController : ControllerBase
         {
             user.Id,
             user.UserName,
-            user.Email,
             Roles = roles
         });
     }
 
-
-
+    // Restricts users from creating other accounts through this endpoint.
+    [Authorize(Roles = "Superuser,Admin")]
     [HttpPost]
     public async Task<IActionResult> CreateUser(
         [FromBody] CreateUserRequest request)
@@ -132,17 +126,6 @@ public class UsersController : ControllerBase
             return Conflict(new
             {
                 message = "This username is already in use."
-            });
-        }
-
-        var existingEmail = await _userManager.FindByEmailAsync(
-            request.Email);
-
-        if (existingEmail != null)
-        {
-            return Conflict(new
-            {
-                message = "This email address is already in use."
             });
         }
 
@@ -162,8 +145,7 @@ public class UsersController : ControllerBase
 
         var user = new IdentityUser
         {
-            UserName = request.UserName,
-            Email = request.Email
+            UserName = request.UserName
         };
 
         var result = await _userManager.CreateAsync(
@@ -199,20 +181,19 @@ public class UsersController : ControllerBase
             {
                 user.Id,
                 user.UserName,
-                user.Email,
                 Role = "User"
             });
     }
 
-
-
+    // User accounts can't update user info.
+    // Superusers can edit regular Users. Admins can edit everyone.
+    [Authorize(Roles = "Superuser,Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateUser(
         string id,
         [FromBody] UpdateUserRequest request)
     {
         var user = await _userManager.FindByIdAsync(id);
-
         if (user == null)
         {
             return NotFound(new
@@ -221,19 +202,29 @@ public class UsersController : ControllerBase
             });
         }
 
-        var existingEmail = await _userManager.FindByEmailAsync(
-            request.Email);
+        // Superusers can only edit accounts with the regular User role.
+        var targetRoles = await _userManager.GetRolesAsync(user);
 
-        if (existingEmail != null && existingEmail.Id != user.Id)
+        if (User.IsInRole("Superuser") && !User.IsInRole("Admin"))
+        {
+            if (targetRoles.Count != 1 || !targetRoles.Contains("User"))
+            {
+                return Forbid();
+            }
+        }
+
+        var existingUserName = await _userManager.FindByNameAsync(
+            request.UserName);
+
+        if (existingUserName != null && existingUserName.Id != user.Id)
         {
             return Conflict(new
             {
-                message = "This email address is already in use."
+                message = "This username is already in use."
             });
         }
 
         user.UserName = request.UserName;
-        user.Email = request.Email;
 
         var result = await _userManager.UpdateAsync(user);
 
@@ -249,13 +240,52 @@ public class UsersController : ControllerBase
         {
             message = "User updated successfully.",
             user.Id,
-            user.UserName,
-            user.Email
+            user.UserName
         });
     }
 
+    // Superusers can delete regular users. Admins can delete everyone.
+    [Authorize(Roles = "Superuser,Admin")]
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteUser(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
 
-   
+        if (user == null)
+        {
+            return NotFound(new
+            {
+                message = "User not found."
+            });
+        }
+
+        // Check the role of the user being deleted
+        var targetRoles = await _userManager.GetRolesAsync(user);
+
+        if (targetRoles.Any(role => role == "Admin" || role == "Superuser")
+            && !User.IsInRole("Admin"))
+        {
+            return Forbid();
+        }
+
+        var result = await _userManager.DeleteAsync(user);
+
+        if (!result.Succeeded)
+        {
+            return BadRequest(new
+            {
+                errors = result.Errors.Select(e => e.Description)
+            });
+        }
+
+        return Ok(new
+        {
+            message = "User deleted successfully."
+        });
+    }
+
+    // Only Admin can change user roles
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id}/role")]
     public async Task<IActionResult> UpdateUserRole(
         string id,
@@ -270,6 +300,19 @@ public class UsersController : ControllerBase
                 message = "User not found."
             });
         }
+
+        var targetRoles = await _userManager.GetRolesAsync(user);
+
+        //Needs to be deleted bc it's only admin's responsibility
+        /*
+        if (targetRoles.Contains("Superuser") ||
+            targetRoles.Contains("Admin"))
+        {
+            if (!User.IsInRole("Admin"))
+            {
+                return Forbid();
+            }
+        } */
 
         var validRoles = new[] { "User", "Superuser", "Admin" };
 
@@ -339,17 +382,12 @@ public class UsersController : ControllerBase
             Role = request.Role
         });
     }
- 
 }
 
 public class CreateUserRequest
 {
     [Required]
     public string UserName { get; set; } = string.Empty;
-
-    [Required]
-    [EmailAddress]
-    public string Email { get; set; } = string.Empty;
 
     [Required]
     [MinLength(8)]
@@ -360,16 +398,10 @@ public class UpdateUserRequest
 {
     [Required]
     public string UserName { get; set; } = string.Empty;
-
-    [Required]
-    [EmailAddress]
-    public string Email { get; set; } = string.Empty;
 }
-
 
 public class UpdateUserRoleRequest
 {
     [Required]
     public string Role { get; set; } = string.Empty;
 }
-
