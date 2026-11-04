@@ -1,3 +1,4 @@
+
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -185,8 +186,8 @@ public class UsersController : ControllerBase
             });
     }
 
-    // User accounts can't update user info.
-    // Superusers can edit regular Users. Admins can edit everyone.
+    // User accounts can't update user info. 
+    // Superusers can edit regular Users. Admins can edit everyone. (Maria)
     [Authorize(Roles = "Superuser,Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateUser(
@@ -202,7 +203,7 @@ public class UsersController : ControllerBase
             });
         }
 
-        // Superusers can only edit accounts with the regular User role.
+        // Superusers can only edit accounts with the regular User role. (Maria)
         var targetRoles = await _userManager.GetRolesAsync(user);
 
         if (User.IsInRole("Superuser") && !User.IsInRole("Admin"))
@@ -243,8 +244,8 @@ public class UsersController : ControllerBase
             user.UserName
         });
     }
-
-    // Superusers can delete regular users. Admins can delete everyone.
+    
+    // Superusers can delete regular users. Admins can delete everyone. (Maria) 
     [Authorize(Roles = "Superuser,Admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUser(string id)
@@ -283,8 +284,8 @@ public class UsersController : ControllerBase
             message = "User deleted successfully."
         });
     }
-
-    // Only Admin can change user roles
+    
+    // Only Admin can change user roles (Maria)
     [Authorize(Roles = "Admin")]
     [HttpPut("{id}/role")]
     public async Task<IActionResult> UpdateUserRole(
@@ -303,7 +304,7 @@ public class UsersController : ControllerBase
 
         var targetRoles = await _userManager.GetRolesAsync(user);
 
-        //Needs to be deleted bc it's only admin's responsibility
+        //Needs to be deleted bc it's only admin's responsibility (Maria)
         /*
         if (targetRoles.Contains("Superuser") ||
             targetRoles.Contains("Admin"))
