@@ -1,4 +1,3 @@
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -123,6 +122,9 @@ var app = builder.Build();
 // Initialize application roles
 using (var scope = app.Services.CreateScope())
 {
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await db.Database.EnsureCreatedAsync();
+
     var roleManager = scope.ServiceProvider
         .GetRequiredService<RoleManager<IdentityRole>>();
 
@@ -144,6 +146,26 @@ using (var scope = app.Services.CreateScope())
                         result.Errors.Select(e => e.Description))
                 );
             }
+        }
+    }
+
+    // Seed first admin from environment variables
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var adminName = builder.Configuration["Seed:AdminUsername"];
+    var adminPw = builder.Configuration["Seed:AdminPassword"];
+    if (!string.IsNullOrEmpty(adminName) && !string.IsNullOrEmpty(adminPw)
+        && await userManager.FindByNameAsync(adminName) is null)
+    {
+        var admin = new ApplicationUser
+        {
+            UserName = adminName,
+            FullName = "Initial Admin",
+            MustChangePassword = true
+        };
+        var created = await userManager.CreateAsync(admin, adminPw);
+        if (created.Succeeded)
+        {
+            await userManager.AddToRoleAsync(admin, "Admin");
         }
     }
 }
