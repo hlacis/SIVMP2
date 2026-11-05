@@ -332,7 +332,6 @@ const UsersPage = ({role, userName, accessToken, onLogout}: UsersPageProps) => {
                 setNewName={setNewName}
                 setNewUsername={setNewUsername}
                 setNewRole={setNewRole}
-                setFormError={setFormError}
                 onClose={() => setIsAddUserOpen(false)}
                 onSubmit={handleAddUser}
             />
@@ -398,7 +397,6 @@ const UsersPage = ({role, userName, accessToken, onLogout}: UsersPageProps) => {
                     setEditName={setEditName}
                     setEditUsername={setEditUsername}
                     setEditRole={setEditRole}
-                    setFormError={setEditFormError}
                     onClose={() => {
                         setIsEditUserOpen(false)
                         setSelectedUser(null)

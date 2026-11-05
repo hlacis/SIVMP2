@@ -11,7 +11,6 @@ type EditUserModalProps = {
     setEditName: (value: string) => void
     setEditUsername: (value: string) => void
     setEditRole: (value: UserRole) => void
-    setFormError: (value: string) => void
     onClose: () => void
     onSubmit: () => void
 }
@@ -27,7 +26,6 @@ const EditUserModal = ({
                            setEditName,
                            setEditUsername,
                            setEditRole,
-                           setFormError,
                            onClose,
                            onSubmit
                        }: EditUserModalProps) => {

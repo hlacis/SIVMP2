@@ -10,7 +10,6 @@ type AddUserModalProps = {
     setNewName: (value: string) => void
     setNewUsername: (value: string) => void
     setNewRole: (value: UserRole) => void
-    setFormError: (value: string) => void
     onClose: () => void
     onSubmit: () => void
     newPassword: string
@@ -26,7 +25,6 @@ const AddUserModal = ({
                           setNewName,
                           setNewUsername,
                           setNewRole,
-                          setFormError,
                           onClose,
                           onSubmit,
                           newPassword,
