@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import '../styles/UsersPage.css'
 import AddUserModal from '../components/AddUserModal'
 import EditUserModal from '../components/EditUserModal'
@@ -7,22 +7,56 @@ import UsersTable from '../components/UsersTable'
 
 type UsersPageProps = {
     role: UserRole
+    userName: string
+    accessToken: string
     onLogout: () => void
 }
 
-// Temporary example data for the user overview
-const exampleUsers: User[] = [
-    { id: 1, name: 'Mette Kvist', username: 'kvist.mette', role: 'Admin' },
-    { id: 2, name: 'Jonas Bjælke', username: 'bjaelke.jonas', role: 'Admin' },
-    { id: 3, name: 'Sofie Lund', username: 'lund.sofie', role: 'Superuser' },
-    { id: 4, name: 'Anders Holm', username: 'holm.anders', role: 'Superuser' },
-    { id: 5, name: 'Camilla Nygaard', username: 'nygaard.camilla', role: 'User' },
-    { id: 6, name: 'Peter Skov', username: 'skov.peter', role: 'User' },
-    { id: 7, name: 'Ida Madsen', username: 'madsen.ida', role: 'User' }
-]
+const UsersPage = ({role, userName, accessToken, onLogout}: UsersPageProps) => {
+    const [users, setUsers] = useState<User[]>([])
+    const [loadError, setLoadError] = useState('')
+    const [deleteError, setDeleteError] = useState('')
 
-const UsersPage = ({ role, onLogout }: UsersPageProps) => {
-    const [users, setUsers] = useState<User[]>(exampleUsers)
+    const api = async (path: string, options: RequestInit = {}) => {
+        const response = await fetch(path, {
+            ...options,
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                ...(options.body ? { 'Content-Type': 'application/json' } : {})
+            }
+        })
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}))
+            throw new Error(body.message || body.title ||
+                (body.errors ? JSON.stringify(body.errors) : `Request failed (${response.status})`))
+        }
+        return response
+    }
+
+    const refreshUsers = async () => {
+        const response = await api('/api/Users?page=1&pageSize=100')
+
+        const data: {
+            users: {
+                id: string
+                userName: string
+                fullName: string | null
+                roles: string[]
+            }[]
+        } = await response.json()
+
+        setUsers(data.users.map(user => ({
+            id: user.id,
+            name: user.fullName ?? user.userName,
+            username: user.userName,
+            role: user.roles.includes('Admin') ? 'Admin' :
+                user.roles.includes('Superuser') ? 'Superuser' : 'User'
+        })))
+    }
+
+    useEffect(() => {
+        void refreshUsers().catch(error => setLoadError(error.message))
+    }, [accessToken])
     const [search, setSearch] = useState('')
     const [selectedRole, setSelectedRole] = useState('All')
 
@@ -34,7 +68,7 @@ const UsersPage = ({ role, onLogout }: UsersPageProps) => {
     const [newUsername, setNewUsername] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [newRole, setNewRole] = useState<UserRole>('User')
-    
+
     // Stores validation messages
     const [formError, setFormError] = useState('')
 
@@ -47,7 +81,7 @@ const UsersPage = ({ role, onLogout }: UsersPageProps) => {
     const [editUsername, setEditUsername] = useState('')
     const [editRole, setEditRole] = useState<UserRole>('User')
     const [editFormError, setEditFormError] = useState('')
-    
+
     // Controls the delete confirmation modal
     const [userToDelete, setUserToDelete] = useState<User | null>(null)
 
@@ -63,44 +97,53 @@ const UsersPage = ({ role, onLogout }: UsersPageProps) => {
         return matchesSearch && matchesRole
     })
 
-    // Adds a new user to the temporary frontend list
-    const handleAddUser = () => {
-        if (!newName.trim() || !newUsername.trim() || !newRole || !newPassword) {
+    // Create the account in SQL Server, then refresh the table.
+    const handleAddUser = async () => {
+        if (!newName.trim() || !newUsername.trim() || !newPassword) {
             setFormError('Please fill in all required fields.')
             return
         }
-
         if (newPassword.length < 12) {
             setFormError('The temporary password must be at least 12 characters.')
             return
         }
-
-        // Prevent duplicate usernames
-        const usernameExists = users.some(
-            user => user.username.toLowerCase() === newUsername.trim().toLowerCase()
-        )
-
-        if (usernameExists) {
-            setFormError('This username already exists.')
+        if (role !== 'Admin' && newRole !== 'User') {
+            setFormError('Only Admins can assign privileged roles.')
             return
         }
 
-        const newUser: User = {
-            id: Math.max(0, ...users.map(user => user.id)) + 1,
-            name: newName.trim(),
-            username: newUsername.trim(),
-            role: newRole
-        }
-
-        setUsers(currentUsers => [...currentUsers, newUser])
-
-        // Reset the form after creating the user
-        setNewName('')
-        setNewUsername('')
-        setNewPassword('')
-        setNewRole('User')
         setFormError('')
-        setIsAddUserOpen(false)
+        try {
+            const response = await api('/api/Users', {
+                method: 'POST',
+                body: JSON.stringify({
+                    userName: newUsername.trim(),
+                    fullName: newName.trim(),
+                    password: newPassword
+                })
+            })
+            const created: { id: string } = await response.json()
+            if (newRole !== 'User') {
+                try {
+                    await api(`/api/Users/${created.id}/role`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ role: newRole })
+                    })
+                } catch (error) {
+                    await refreshUsers()
+                    setFormError(`Account created as User, but role assignment failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+                    return
+                }
+            }
+            await refreshUsers()
+            setNewName('')
+            setNewUsername('')
+            setNewPassword('')
+            setNewRole('User')
+            setIsAddUserOpen(false)
+        } catch (error) {
+            setFormError(error instanceof Error ? error.message : 'Could not create user.')
+        }
     }
 
     // Opens the Edit user modal with the selected user's current details
@@ -113,44 +156,44 @@ const UsersPage = ({ role, onLogout }: UsersPageProps) => {
         setIsEditUserOpen(true)
     }
 
-    // Saves changes to the selected user
-    const handleSaveEditUser = () => {
+    // Update the account through the API.
+    const handleSaveEditUser = async () => {
         if (!selectedUser) return
-
         if (!editName.trim() || !editUsername.trim()) {
             setEditFormError('Please fill in all required fields.')
             return
         }
-
-        // Prevent duplicate usernames belonging to another user
-        const usernameExists = users.some(
-            user =>
-                user.id !== selectedUser.id &&
-                user.username.toLowerCase() === editUsername.trim().toLowerCase()
-        )
-
-        if (usernameExists) {
-            setEditFormError('This username already exists.')
+        if (role !== 'Admin' && editRole !== selectedUser.role) {
+            setEditFormError('Only Admins can change roles.')
             return
         }
-
-        // Update the selected user in the temporary frontend list
-        setUsers(currentUsers =>
-            currentUsers.map(user =>
-                user.id === selectedUser.id
-                    ? {
-                        ...user,
-                        name: editName.trim(),
-                        username: editUsername.trim(),
-                        role: editRole
-                    }
-                    : user
-            )
-        )
-
-        setIsEditUserOpen(false)
-        setSelectedUser(null)
         setEditFormError('')
+        try {
+            if (
+                editUsername.trim() !== selectedUser.username ||
+                editName.trim() !== selectedUser.name
+            ) {
+                await api(`/api/Users/${selectedUser.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        userName: editUsername.trim(),
+                        fullName: editName.trim()
+                    })
+                })
+            }
+            if (editRole !== selectedUser.role) {
+                await api(`/api/Users/${selectedUser.id}/role`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ role: editRole })
+                })
+            }
+            await refreshUsers()
+            setIsEditUserOpen(false)
+            setSelectedUser(null)
+        } catch (error) {
+            setEditFormError(error instanceof Error ? error.message : 'Could not update user.')
+            await refreshUsers().catch(() => {})
+        }
     }
 
     // Opens the delete confirmation modal
@@ -158,16 +201,18 @@ const UsersPage = ({ role, onLogout }: UsersPageProps) => {
         setUserToDelete(user)
     }
 
-    // Deletes the selected user after confirmation
-    const handleConfirmDeleteUser = () => {
+    // Delete from SQL Server, not just React state.
+    const handleConfirmDeleteUser = async () => {
         if (!userToDelete) return
-
-        setUsers(currentUsers =>
-            currentUsers.filter(user => user.id !== userToDelete.id)
-        )
-
-        setUserToDelete(null)
-}
+        setDeleteError('')
+        try {
+            await api(`/api/Users/${userToDelete.id}`, { method: 'DELETE' })
+            setUserToDelete(null)
+            await refreshUsers()
+        } catch (error) {
+            setDeleteError(error instanceof Error ? error.message : 'Could not delete user.')
+        }
+    }
 
     return (
         <main className="users-page">
@@ -196,7 +241,7 @@ const UsersPage = ({ role, onLogout }: UsersPageProps) => {
                 </div>
 
                 <div className="current-user">
-                    <strong className="current-user-name">Mette Kvist</strong>
+                    <strong className="current-user-name">{userName}</strong>
 
                     <span className="current-user-role">{role}</span>
 
@@ -262,6 +307,7 @@ const UsersPage = ({ role, onLogout }: UsersPageProps) => {
                     />
                 </div>
 
+                {loadError && <p role="alert">{loadError}</p>}
                 <UsersTable
                     users={filteredUsers}
                     role={role}
@@ -318,6 +364,7 @@ const UsersPage = ({ role, onLogout }: UsersPageProps) => {
                             </button>
                         </div>
 
+                        {deleteError && <p role="alert">{deleteError}</p>}
                         <div className="modal-actions">
                             <button
                                 className="cancel-button"
@@ -338,8 +385,6 @@ const UsersPage = ({ role, onLogout }: UsersPageProps) => {
                     </div>
                 </div>
             )}
-            
-            
 
             {selectedUser && (
                 <EditUserModal

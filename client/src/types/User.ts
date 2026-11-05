@@ -1,7 +1,8 @@
-﻿export type UserRole = 'User' | 'Superuser' | 'Admin'
+﻿
+export type UserRole = 'User' | 'Superuser' | 'Admin'
 
 export type User = {
-    id: number
+    id: string
     name: string
     username: string
     role: UserRole

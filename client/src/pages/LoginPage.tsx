@@ -2,23 +2,83 @@
 import { useState } from 'react'
 import '../styles/LoginPage.css'
 
-type LoginPageProps = {
-    onLoginSuccess: () => void
+type AuthenticatedUser = {
+    id: string
+    userName: string
+    fullName: string | null
+    roles: string[]
+    mustChangePassword: boolean
 }
-const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
+
+type LoginPageProps = {
+    onLoginSuccess: (user: AuthenticatedUser, token: string) => void
+}
+
+function LoginPage({ onLoginSuccess }: LoginPageProps) {
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
-    const [showPassword, setShowPassword] = useState(false)
     const [loginError, setLoginError] = useState('')
+    const [isLoading, setIsLoading] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
 
-    const handleLogin = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault()
+
         setLoginError('')
+        setIsLoading(true)
 
-        // Backend login validation will be added here
-        console.log('Login form submitted')
+        try {
+            const loginResponse = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    userName: username,
+                    password: password
+                })
+            })
 
-        // Temporary navigation will be connected after backend validation
+            if (!loginResponse.ok) {
+                if (loginResponse.status === 401) {
+                    const errorData = await loginResponse.json()
+
+                    if (errorData.message === 'Account temporarily locked.') {
+                        throw new Error(
+                            'Your account is temporarily locked. Please try again in 5 minutes.'
+                        )
+                    }
+
+                    if (errorData.message === 'Account is not confirmed.') {
+                        throw new Error('Your account is not confirmed.')
+                    }
+
+                    throw new Error('Invalid username or password.')
+                }
+
+                throw new Error('Login failed. Please try again.')
+            }
+
+            const data: AuthenticatedUser & { token: string } =
+                await loginResponse.json()
+
+            if (!data.token) {
+                throw new Error('Authentication token was not received.')
+            }
+
+            const { token, ...user } = data
+
+            onLoginSuccess(user, token)
+
+        } catch (error) {
+            setLoginError(
+                error instanceof Error
+                    ? error.message
+                    : 'Something went wrong.'
+            )
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -87,16 +147,27 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
                         </button>
                     </div>
 
-                    <button className="login-button" type="submit">
-                        Log in
+                    {loginError && (
+                        <p
+                            role="alert"
+                            style={{
+                                color: '#dc2626',
+                                marginBottom: '12px'
+                            }}
+                        >
+                            {loginError}
+                        </p>
+                    )}
+
+                    <button
+                        className="login-button"
+                        type="submit"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? 'Logging in...' : 'Log in'}
                     </button>
                 </form>
 
-                {loginError && (
-                    <p className="login-error" role="alert">
-                        {loginError}
-                    </p>
-                )}
                 <p className="login-footer">
                     Secure access for authorised employees
                 </p>

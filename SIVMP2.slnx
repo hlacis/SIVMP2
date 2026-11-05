@@ -2,4 +2,7 @@
   <Folder Name="/server/">
     <Project Path="server/SIVMP2.Api/SIVMP2.Api.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SIVMP2.Tests/SIVMP2.Tests.csproj" />
+  </Folder>
 </Solution>

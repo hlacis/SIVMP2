@@ -1,63 +1,104 @@
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import LoginPage from './pages/LoginPage'
 import UsersPage from './pages/UsersPage'
 import FirstLoginPage from './pages/FirstLoginPage'
 
 type UserRole = 'Admin' | 'Superuser' | 'User'
 
-type Page = 'login' | 'users' | 'firstLogin'
+type AuthenticatedUser = {
+    id: string
+    userName: string
+    fullName: string | null
+    roles: string[]
+    mustChangePassword: boolean
+}
 
 function App() {
-    const [currentPage, setCurrentPage] = useState<Page>('login')
-    const [currentRole, setCurrentRole] = useState<UserRole>('Admin')
-    // Logs out the current user and returns to the login page
-    const handleLogout = () => {
-        setCurrentPage('login')
-        setCurrentRole('User')
+    const [currentUser, setCurrentUser] =
+        useState<AuthenticatedUser | null>(null)
+
+    const [accessToken, setAccessToken] =
+        useState<string | null>(null)
+
+    const handleLoginSuccess = (
+        user: AuthenticatedUser,
+        token: string
+    ) => {
+        setAccessToken(token)
+        setCurrentUser(user)
     }
+
+    const handleLogout = () => {
+        setAccessToken(null)
+        setCurrentUser(null)
+    }
+
+    const handlePasswordChanged = () => {
+        // Require a fresh login after changing the password.
+        handleLogout()
+    }
+
+    // Automatically log out when the JWT expires.
+    useEffect(() => {
+        if (!accessToken) return
+
+        const payloadPart = accessToken.split('.')[1]
+
+        if (!payloadPart) {
+            handleLogout()
+            return
+        }
+
+        try {
+            const base64 = payloadPart
+                .replace(/-/g, '+')
+                .replace(/_/g, '/')
+
+            const payload = JSON.parse(atob(base64))
+            const expiresAt = payload.exp * 1000
+            const remainingTime = expiresAt - Date.now()
+
+            if (!Number.isFinite(remainingTime) || remainingTime <= 0) {
+                handleLogout()
+                return
+            }
+
+            const timeout = window.setTimeout(
+                handleLogout,
+                Math.min(remainingTime, 2147483647)
+            )
+
+            return () => window.clearTimeout(timeout)
+        } catch {
+            handleLogout()
+        }
+    }, [accessToken])
+
+    const currentRole: UserRole =
+        currentUser?.roles.includes('Admin') ? 'Admin' :
+            currentUser?.roles.includes('Superuser') ? 'Superuser' :
+                'User'
 
     return (
         <>
-            {currentPage === 'login' ? (
-                <LoginPage
-                    onLoginSuccess={() => setCurrentPage('users')}
-                />
-            ) : currentPage === 'firstLogin' ? (
-                <FirstLoginPage />
+            {currentUser && accessToken ? (
+                currentUser.mustChangePassword ? (
+                    <FirstLoginPage
+                        accessToken={accessToken}
+                        onPasswordChanged={handlePasswordChanged}
+                    />
+                ) : (
+                    <UsersPage
+                        role={currentRole}
+                        userName={currentUser.userName}
+                        accessToken={accessToken}
+                        onLogout={handleLogout}
+                    />
+                )
             ) : (
-                <UsersPage
-                    role={currentRole}
-                    onLogout={handleLogout}
-                />
+                <LoginPage onLoginSuccess={handleLoginSuccess} />
             )}
-
-            {/* Temporary navigation for development */}
-            <nav className="page-switcher">
-                <button onClick={() => setCurrentPage('login')}>
-                    Login page
-                </button>
-
-                <button onClick={() => setCurrentPage('firstLogin')}>
-                    First login page
-                </button>
-
-                <button onClick={() => setCurrentPage('users')}>
-                    Users page
-                </button>
-
-                <button onClick={() => setCurrentRole('Admin')}>
-                    Admin
-                </button>
-
-                <button onClick={() => setCurrentRole('Superuser')}>
-                    Superuser
-                </button>
-
-                <button onClick={() => setCurrentRole('User')}>
-                    User
-                </button>
-            </nav>
         </>
     )
 }
