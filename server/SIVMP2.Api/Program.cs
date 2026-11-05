@@ -15,7 +15,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Identity: user management and password security, without cookies
 builder.Services
-    .AddIdentityCore<IdentityUser>(options =>
+    .AddIdentityCore<ApplicationUser>(options =>
     {
         options.Password.RequiredLength = 8;
         options.Password.RequireDigit = true;

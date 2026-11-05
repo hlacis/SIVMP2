@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
+using SIVMP2.Api.Data;
 
 namespace SIVMP2.Api.Controllers;
 
@@ -12,11 +13,11 @@ namespace SIVMP2.Api.Controllers;
 [Authorize(Roles = "User,Superuser,Admin")]
 public class UsersController : ControllerBase
 {
-    private readonly UserManager<IdentityUser> _userManager;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
 
     public UsersController(
-        UserManager<IdentityUser> userManager,
+        UserManager<ApplicationUser> userManager,
         RoleManager<IdentityRole> roleManager)
     {
         _userManager = userManager;
@@ -54,6 +55,7 @@ public class UsersController : ControllerBase
             {
                 user.Id,
                 user.UserName,
+                user.FullName,
                 Roles = roles
             });
         }
@@ -85,7 +87,8 @@ public class UsersController : ControllerBase
         return Ok(new
         {
             user.Id,
-            user.UserName
+            user.UserName,
+            user.FullName
         });
     }
 
@@ -109,6 +112,7 @@ public class UsersController : ControllerBase
         {
             user.Id,
             user.UserName,
+            user.FullName,
             Roles = roles
         });
     }
@@ -144,9 +148,10 @@ public class UsersController : ControllerBase
             }
         }
 
-        var user = new IdentityUser
+        var user = new ApplicationUser
         {
-            UserName = request.UserName
+            UserName = request.UserName,
+            FullName = request.FullName
         };
 
         var result = await _userManager.CreateAsync(
@@ -180,8 +185,10 @@ public class UsersController : ControllerBase
             new { id = user.Id },
             new
             {
+                
                 user.Id,
                 user.UserName,
+                user.FullName,
                 Role = "User"
             });
     }
@@ -226,6 +233,7 @@ public class UsersController : ControllerBase
         }
 
         user.UserName = request.UserName;
+        user.FullName = request.FullName;
 
         var result = await _userManager.UpdateAsync(user);
 
@@ -241,7 +249,8 @@ public class UsersController : ControllerBase
         {
             message = "User updated successfully.",
             user.Id,
-            user.UserName
+            user.UserName,
+            user.FullName
         });
     }
     
@@ -391,6 +400,9 @@ public class CreateUserRequest
     public string UserName { get; set; } = string.Empty;
 
     [Required]
+    public string FullName { get; set; } = string.Empty;
+
+    [Required]
     [MinLength(8)]
     public string Password { get; set; } = string.Empty;
 }
@@ -399,6 +411,9 @@ public class UpdateUserRequest
 {
     [Required]
     public string UserName { get; set; } = string.Empty;
+
+    [Required]
+    public string FullName { get; set; } = string.Empty;
 }
 
 public class UpdateUserRoleRequest

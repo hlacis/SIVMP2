@@ -35,10 +35,19 @@ const UsersPage = ({role, userName, accessToken, onLogout}: UsersPageProps) => {
 
     const refreshUsers = async () => {
         const response = await api('/api/Users?page=1&pageSize=100')
-        const data: { users: { id: string; userName: string; roles: string[] }[] } = await response.json()
+
+        const data: {
+            users: {
+                id: string
+                userName: string
+                fullName: string | null
+                roles: string[]
+            }[]
+        } = await response.json()
+
         setUsers(data.users.map(user => ({
             id: user.id,
-            name: user.userName,
+            name: user.fullName ?? user.userName,
             username: user.userName,
             role: user.roles.includes('Admin') ? 'Admin' :
                 user.roles.includes('Superuser') ? 'Superuser' : 'User'
@@ -107,7 +116,11 @@ const UsersPage = ({role, userName, accessToken, onLogout}: UsersPageProps) => {
         try {
             const response = await api('/api/Users', {
                 method: 'POST',
-                body: JSON.stringify({ userName: newUsername.trim(), password: newPassword })
+                body: JSON.stringify({
+                    userName: newUsername.trim(),
+                    fullName: newName.trim(),
+                    password: newPassword
+                })
             })
             const created: { id: string } = await response.json()
             if (newRole !== 'User') {
@@ -156,10 +169,16 @@ const UsersPage = ({role, userName, accessToken, onLogout}: UsersPageProps) => {
         }
         setEditFormError('')
         try {
-            if (editUsername.trim() !== selectedUser.username) {
+            if (
+                editUsername.trim() !== selectedUser.username ||
+                editName.trim() !== selectedUser.name
+            ) {
                 await api(`/api/Users/${selectedUser.id}`, {
                     method: 'PUT',
-                    body: JSON.stringify({ userName: editUsername.trim() })
+                    body: JSON.stringify({
+                        userName: editUsername.trim(),
+                        fullName: editName.trim()
+                    })
                 })
             }
             if (editRole !== selectedUser.role) {

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace SIVMP2.Api.Data;
 
-public class ApplicationDbContext : IdentityDbContext
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
@@ -15,7 +15,7 @@ public class ApplicationDbContext : IdentityDbContext
     {
         base.OnModelCreating(builder);
 
-        builder.Entity<IdentityUser>(entity =>
+        builder.Entity<ApplicationUser>(entity =>
         {
             entity.Ignore(user => user.Email);
             entity.Ignore(user => user.NormalizedEmail);

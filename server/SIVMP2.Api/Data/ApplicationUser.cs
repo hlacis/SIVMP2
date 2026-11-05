@@ -1,0 +1,8 @@
+using Microsoft.AspNetCore.Identity;
+
+namespace SIVMP2.Api.Data;
+
+public class ApplicationUser : IdentityUser
+{
+    public string? FullName { get; set; }
+}

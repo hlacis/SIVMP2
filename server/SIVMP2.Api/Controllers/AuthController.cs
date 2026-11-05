@@ -1,4 +1,4 @@
-
+using SIVMP2.Api.Data;
 using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -14,11 +14,11 @@ namespace SIVMP2.Api.Controllers;
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
-    private readonly UserManager<IdentityUser> _userManager;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly IConfiguration _configuration;
 
     public AuthController(
-        UserManager<IdentityUser> userManager,
+        UserManager<ApplicationUser> userManager,
         IConfiguration configuration)
     {
         _userManager = userManager;
@@ -74,15 +74,6 @@ public class AuthController : ControllerBase
             });
         }
 
-        if (!await _userManager.IsEmailConfirmedAsync(user)
-            && _userManager.Options.SignIn.RequireConfirmedEmail)
-        {
-            return Unauthorized(new
-            {
-                message = "Account is not confirmed."
-            });
-        }
-
         if (_userManager.SupportsUserLockout)
         {
             await _userManager.ResetAccessFailedCountAsync(user);
@@ -127,7 +118,7 @@ public class AuthController : ControllerBase
             expiresAt,
             user.Id,
             user.UserName,
-            user.Email,
+            user.FullName,
             Roles = roles
         });
     }
@@ -157,7 +148,7 @@ public class AuthController : ControllerBase
         {
             user.Id,
             user.UserName,
-            user.Email,
+            user.FullName,
             Roles = roles
         });
     }
