@@ -2,14 +2,16 @@
 import { useEffect, useState } from 'react'
 import LoginPage from './pages/LoginPage'
 import UsersPage from './pages/UsersPage'
+import FirstLoginPage from './pages/FirstLoginPage'
 
 type UserRole = 'Admin' | 'Superuser' | 'User'
 
 type AuthenticatedUser = {
     id: string
     userName: string
-    email: string | null
+    fullName: string | null
     roles: string[]
+    mustChangePassword: boolean
 }
 
 function App() {
@@ -30,6 +32,11 @@ function App() {
     const handleLogout = () => {
         setAccessToken(null)
         setCurrentUser(null)
+    }
+
+    const handlePasswordChanged = () => {
+        // Require a fresh login after changing the password.
+        handleLogout()
     }
 
     // Automatically log out when the JWT expires.
@@ -76,12 +83,19 @@ function App() {
     return (
         <>
             {currentUser && accessToken ? (
-                <UsersPage
-                    role={currentRole}
-                    userName={currentUser.userName}
-                    accessToken={accessToken}
-                    onLogout={handleLogout}
-                />
+                currentUser.mustChangePassword ? (
+                    <FirstLoginPage
+                        accessToken={accessToken}
+                        onPasswordChanged={handlePasswordChanged}
+                    />
+                ) : (
+                    <UsersPage
+                        role={currentRole}
+                        userName={currentUser.userName}
+                        accessToken={accessToken}
+                        onLogout={handleLogout}
+                    />
+                )
             ) : (
                 <LoginPage onLoginSuccess={handleLoginSuccess} />
             )}

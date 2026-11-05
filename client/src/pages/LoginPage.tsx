@@ -5,8 +5,9 @@ import '../styles/LoginPage.css'
 type AuthenticatedUser = {
     id: string
     userName: string
-    email: string | null
+    fullName: string | null
     roles: string[]
+    mustChangePassword: boolean
 }
 
 type LoginPageProps = {

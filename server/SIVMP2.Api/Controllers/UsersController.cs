@@ -151,7 +151,8 @@ public class UsersController : ControllerBase
         var user = new ApplicationUser
         {
             UserName = request.UserName,
-            FullName = request.FullName
+            FullName = request.FullName,
+            MustChangePassword = true
         };
 
         var result = await _userManager.CreateAsync(

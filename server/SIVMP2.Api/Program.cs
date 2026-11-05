@@ -1,4 +1,6 @@
 
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -54,7 +56,38 @@ builder.Services
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userId = context.Principal?.FindFirstValue(
+                    JwtRegisteredClaimNames.Sub);
 
+                var tokenSecurityStamp = context.Principal?.FindFirstValue(
+                    "security_stamp");
+
+                if (string.IsNullOrEmpty(userId) ||
+                    string.IsNullOrEmpty(tokenSecurityStamp))
+                {
+                    context.Fail("Invalid token.");
+                    return;
+                }
+
+                var userManager = context.HttpContext.RequestServices
+                    .GetRequiredService<UserManager<ApplicationUser>>();
+
+                var user = await userManager.FindByIdAsync(userId);
+
+                if (user == null ||
+                    !string.Equals(
+                        user.SecurityStamp,
+                        tokenSecurityStamp,
+                        StringComparison.Ordinal))
+                {
+                    context.Fail("Token has been revoked.");
+                }
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -128,6 +161,63 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.UseAuthentication();
+
+// Enforce mandatory password change before accessing protected APIs
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+
+    // Only check authenticated API requests
+    if (path.StartsWithSegments("/api") &&
+        context.User.Identity?.IsAuthenticated == true)
+    {
+        // Allow the user to change their password and check account status
+        var allowedPath =
+            path.Equals("/api/auth/change-password",
+                StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/api/auth/me",
+                StringComparison.OrdinalIgnoreCase);
+
+        if (!allowedPath)
+        {
+            var userId = context.User.FindFirstValue(
+                JwtRegisteredClaimNames.Sub);
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            var userManager = context.RequestServices
+                .GetRequiredService<UserManager<ApplicationUser>>();
+
+            var user = await userManager.FindByIdAsync(userId);
+
+            if (user == null)
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            if (user.MustChangePassword)
+            {
+                context.Response.StatusCode = 403;
+
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    message = "You must change your password before continuing.",
+                    mustChangePassword = true
+                });
+
+                return;
+            }
+        }
+    }
+
+    await next(context);
+});
+
 app.UseAuthorization();
 
 app.MapControllers();

@@ -85,7 +85,8 @@ public class AuthController : ControllerBase
         {
             new(JwtRegisteredClaimNames.Sub, user.Id),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new("name", user.UserName ?? "")
+            new("name", user.UserName ?? ""),
+            new("security_stamp", user.SecurityStamp ?? "")
         };
 
         foreach (var role in roles)
@@ -114,6 +115,7 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             message = "Login successful.",
+            user.MustChangePassword,
             token = tokenString,
             expiresAt,
             user.Id,
@@ -149,10 +151,72 @@ public class AuthController : ControllerBase
             user.Id,
             user.UserName,
             user.FullName,
+            user.MustChangePassword,
             Roles = roles
         });
     }
+    
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordRequest request)
+    {
+        var userId = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        if (request.NewPassword != request.ConfirmPassword)
+        {
+            return BadRequest(new
+            {
+                message = "Passwords do not match."
+            });
+        }
+
+        var result = await _userManager.ChangePasswordAsync(
+            user,
+            request.CurrentPassword,
+            request.NewPassword
+        );
+
+        if (!result.Succeeded)
+        {
+            return BadRequest(new
+            {
+                errors = result.Errors.Select(e => e.Description)
+            });
+        }
+
+        user.MustChangePassword = false;
+
+        var updateResult = await _userManager.UpdateAsync(user);
+
+        if (!updateResult.Succeeded)
+        {
+            return StatusCode(500, new
+            {
+                message = "Password changed, but account status could not be updated."
+            });
+        }
+
+        return Ok(new
+        {
+            message = "Password changed successfully."
+        });
+    }
+
 }
+
 
 public class LoginRequest
 {
@@ -161,4 +225,16 @@ public class LoginRequest
 
     [Required]
     public string Password { get; set; } = string.Empty;
+}
+
+public class ChangePasswordRequest
+{
+    [Required]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required]
+    public string NewPassword { get; set; } = string.Empty;
+
+    [Required]
+    public string ConfirmPassword { get; set; } = string.Empty;
 }

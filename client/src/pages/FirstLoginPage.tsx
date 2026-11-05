@@ -1,13 +1,23 @@
-﻿import { useState } from 'react'
+﻿
+import { useState } from 'react'
 import '../styles/FirstLoginPage.css'
 
-const FirstLoginPage = () => {
+type FirstLoginPageProps = {
+    accessToken: string
+    onPasswordChanged: () => void
+}
+
+const FirstLoginPage = ({
+                            accessToken,
+                            onPasswordChanged
+                        }: FirstLoginPageProps) => {
+    const [currentPassword, setCurrentPassword] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [repeatPassword, setRepeatPassword] = useState('')
     const [error, setError] = useState('')
+    const [isLoading, setIsLoading] = useState(false)
 
-    // Validates the new password before continuing
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault()
         setError('')
 
@@ -21,8 +31,42 @@ const FirstLoginPage = () => {
             return
         }
 
-        // Backend integration will be added later
-        setError('The form is valid. Password saving is not connected yet.')
+        setIsLoading(true)
+
+        try {
+            const response = await fetch('/api/auth/change-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({
+                    currentPassword,
+                    newPassword,
+                    confirmPassword: repeatPassword
+                })
+            })
+
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(
+                    data.message ||
+                    (data.errors
+                        ? data.errors.join(', ')
+                        : 'Password change failed.')
+                )
+            }
+
+            onPasswordChanged()
+        } catch (error) {
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not change password.'
+            )
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -36,13 +80,29 @@ const FirstLoginPage = () => {
                 </p>
 
                 <form onSubmit={handleSubmit}>
-                    <label htmlFor="new-password">New password</label>
+                    <label htmlFor="current-password">
+                        Temporary password
+                    </label>
+                    <input
+                        id="current-password"
+                        type="password"
+                        value={currentPassword}
+                        onChange={event => setCurrentPassword(event.target.value)}
+                        placeholder="Enter temporary password"
+                        autoComplete="current-password"
+                        required
+                    />
+
+                    <label htmlFor="new-password">
+                        New password
+                    </label>
                     <input
                         id="new-password"
                         type="password"
                         value={newPassword}
                         onChange={event => setNewPassword(event.target.value)}
                         placeholder="Enter new password"
+                        autoComplete="new-password"
                         minLength={12}
                         required
                     />
@@ -60,6 +120,7 @@ const FirstLoginPage = () => {
                         value={repeatPassword}
                         onChange={event => setRepeatPassword(event.target.value)}
                         placeholder="Repeat new password"
+                        autoComplete="new-password"
                         minLength={12}
                         required
                     />
@@ -70,8 +131,12 @@ const FirstLoginPage = () => {
                         </p>
                     )}
 
-                    <button type="submit" className="first-login-button">
-                        Save new password
+                    <button
+                        type="submit"
+                        className="first-login-button"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? 'Saving...' : 'Save new password'}
                     </button>
                 </form>
             </section>
